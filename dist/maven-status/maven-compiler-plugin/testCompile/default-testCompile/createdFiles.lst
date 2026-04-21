@@ -1,0 +1,4 @@
+com\localsearch\index\IncrementalIndexerTest.class
+com\localsearch\util\TokenizerTest.class
+com\localsearch\crawler\FileCrawlerTest.class
+com\localsearch\search\SearchServiceTest.class

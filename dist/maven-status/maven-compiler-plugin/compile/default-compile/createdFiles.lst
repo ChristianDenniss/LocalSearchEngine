@@ -1,0 +1,10 @@
+com\localsearch\cli\package-info.class
+com\localsearch\index\package-info.class
+com\localsearch\ranking\package-info.class
+com\localsearch\crawler\FileCrawler$1.class
+com\localsearch\crawler\package-info.class
+com\localsearch\model\package-info.class
+com\localsearch\crawler\CrawledFile.class
+com\localsearch\search\package-info.class
+com\localsearch\index\IncrementalIndexer.class
+com\localsearch\util\package-info.class
