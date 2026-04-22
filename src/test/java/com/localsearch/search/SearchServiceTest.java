@@ -30,4 +30,20 @@ class SearchServiceTest
         assertEquals(1, results.size());
         assertEquals("b.txt", results.get(0).getDocument().getPath(), "Rare term should strongly boost docB");
     }
+
+    @Test
+    void boostsDocumentWhenQueryMatchesFileName()
+    {
+        long now = System.currentTimeMillis();
+        DocumentRecord byName = new DocumentRecord(1, "resume-john-doe.pdf", "general profile text", now);
+        DocumentRecord byBody = new DocumentRecord(2, "notes.txt", "general profile text", now - 1000L);
+
+        InvertedIndex index = new IndexBuilder(new Tokenizer()).build(List.of(byName, byBody));
+        SearchService service = new SearchService(new Tokenizer(), new Ranker());
+
+        List<SearchResult> results = service.search(index, "resume", 5);
+
+        assertEquals(1, results.size());
+        assertEquals("resume-john-doe.pdf", results.get(0).getDocument().getPath());
+    }
 }

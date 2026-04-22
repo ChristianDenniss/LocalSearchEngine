@@ -28,4 +28,27 @@ public class Tokenizer
         }
         return tokens;
     }
+
+    /**
+     * Same normalization as {@link #tokenize(String)} but returns one lowercased phrase
+     * (spaces collapsed) for substring / contains search.
+     */
+    public String normalizeForSubstringSearch(String text)
+    {
+        if (text == null || text.isBlank())
+        {
+            return "";
+        }
+        String normalized = PUNCTUATION.matcher(text.toLowerCase(Locale.ROOT)).replaceAll(" ");
+        return normalized.trim().replaceAll("\\s+", " ");
+    }
+
+    /**
+     * Tokens kept in the inverted index. Drops 1-character tokens so noisy PDF output
+     * (e.g. spaced-out letters) does not flood the index.
+     */
+    public List<String> tokenizeForIndexing(String text)
+    {
+        return tokenize(text).stream().filter(token -> token.length() >= 2).toList();
+    }
 }

@@ -11,6 +11,7 @@ public class CliOptions
     private int limit = 5;
     private boolean explain;
     private boolean reindex;
+    private boolean listIndexed;
     private Path rootDirectory = defaultRootDirectory();
     private Path indexFile = defaultRootDirectory().resolve("index.dat").toAbsolutePath().normalize();
 
@@ -52,6 +53,16 @@ public class CliOptions
     public void setReindex(boolean reindex)
     {
         this.reindex = reindex;
+    }
+
+    public boolean isListIndexed()
+    {
+        return listIndexed;
+    }
+
+    public void setListIndexed(boolean listIndexed)
+    {
+        this.listIndexed = listIndexed;
     }
 
     public Path getRootDirectory()

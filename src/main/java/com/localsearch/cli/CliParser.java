@@ -43,6 +43,7 @@ public class CliParser
                     ensureValue(args, i, "--index");
                     options.setIndexFile(Paths.get(args[i]));
                 }
+                case "list" -> options.setListIndexed(true);
                 default ->
                 {
                     if (options.getQuery() == null)

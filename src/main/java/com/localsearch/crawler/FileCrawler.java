@@ -1,9 +1,9 @@
 package com.localsearch.crawler;
 
 import com.localsearch.model.DocumentRecord;
+import com.localsearch.util.DocumentTextExtractor;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,8 +15,33 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class FileCrawler
 {
-    private static final List<String> SUPPORTED_EXTENSIONS = List.of(".txt", ".md");
+    /**
+     * Indexed files (case-insensitive suffix). Text is read as UTF-8; PDF / Office formats use parsers.
+     * Nested folders are walked recursively.
+     */
+    private static final List<String> SUPPORTED_EXTENSIONS = List.of(
+            ".pdf",
+            ".docx",
+            ".xlsx", ".xlsm", ".xls",
+            ".pptx",
+            ".txt", ".md", ".markdown",
+            ".java", ".kt", ".kts",
+            ".py", ".js", ".mjs", ".cjs", ".ts", ".jsx", ".tsx",
+            ".c", ".cc", ".cpp", ".h", ".hpp",
+            ".cs", ".go", ".rs", ".rb", ".php", ".swift", ".scala",
+            ".json", ".xml", ".yaml", ".yml", ".toml",
+            ".html", ".htm", ".css", ".scss", ".sass", ".less",
+            ".sql", ".log", ".csv", ".tsv",
+            ".sh", ".bash", ".zsh", ".ps1", ".bat", ".cmd",
+            ".gradle", ".properties", ".ini", ".cfg", ".conf", ".env",
+            ".rst", ".adoc");
+
     private static final List<String> IGNORED_DIRECTORIES = List.of(".git", "node_modules");
+
+    public static String supportedExtensionsSummary()
+    {
+        return String.join(", ", SUPPORTED_EXTENSIONS);
+    }
 
     public List<DocumentRecord> crawl(Path rootDirectory) throws IOException
     {
@@ -69,14 +94,16 @@ public class FileCrawler
 
     public String readContent(Path path)
     {
-        try
-        {
-            return Files.readString(path, StandardCharsets.UTF_8);
-        }
-        catch (IOException ignored)
+        if (!isIndexedFile(path))
         {
             return null;
         }
+        return DocumentTextExtractor.readPlainText(path);
+    }
+
+    public boolean isIndexedFile(Path path)
+    {
+        return isIndexedFileSuffix(path);
     }
 
     private List<Path> crawlPaths(Path rootDirectory) throws IOException
@@ -98,7 +125,7 @@ public class FileCrawler
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
             {
-                if (isTextFile(file))
+                if (isIndexedFile(file))
                 {
                     paths.add(file);
                 }
@@ -108,7 +135,7 @@ public class FileCrawler
         return paths;
     }
 
-    private boolean isTextFile(Path path)
+    private boolean isIndexedFileSuffix(Path path)
     {
         String fileName = path.getFileName().toString().toLowerCase();
         return SUPPORTED_EXTENSIONS.stream().anyMatch(fileName::endsWith);

@@ -39,4 +39,17 @@ class FileCrawlerTest
         assertEquals(1, documents.size());
         assertEquals(visible.toString(), documents.get(0).getPath());
     }
+
+    @Test
+    void indexesNestedJavaFiles() throws IOException
+    {
+        Path nested = tempDir.resolve("project").resolve("src").resolve("Main.java");
+        Files.createDirectories(nested.getParent());
+        Files.writeString(nested, "class Main { }");
+
+        List<DocumentRecord> documents = new FileCrawler().crawl(tempDir);
+
+        assertEquals(1, documents.size());
+        assertEquals(nested.toString(), documents.get(0).getPath());
+    }
 }
