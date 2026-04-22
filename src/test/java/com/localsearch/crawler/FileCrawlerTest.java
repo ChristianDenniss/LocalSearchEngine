@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FileCrawlerTest
 {
@@ -51,5 +52,23 @@ class FileCrawlerTest
 
         assertEquals(1, documents.size());
         assertEquals(nested.toString(), documents.get(0).getPath());
+    }
+
+    @Test
+    void indexesUnknownExtensionByFileNameOnly() throws IOException
+    {
+        Path known = tempDir.resolve("notes.txt");
+        Path unknown = tempDir.resolve("model.sketch");
+        Files.writeString(known, "hello world");
+        Files.writeString(unknown, "binary-not-indexed");
+
+        List<DocumentRecord> documents = new FileCrawler().crawl(tempDir);
+
+        assertEquals(2, documents.size());
+        DocumentRecord sketch = documents.stream()
+                .filter(d -> d.getPath().equals(unknown.toString()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(sketch.getContent().isEmpty());
     }
 }

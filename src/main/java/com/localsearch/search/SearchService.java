@@ -114,12 +114,12 @@ public class SearchService
 
         for (DocumentRecord document : index.getDocumentsById().values())
         {
-            String content = document.getContent();
-            if (content == null || content.isBlank())
+            String body = substringSearchBody(document);
+            if (body.isBlank())
             {
                 continue;
             }
-            String lower = content.toLowerCase(Locale.ROOT);
+            String lower = body.toLowerCase(Locale.ROOT);
 
             SubstringHit hit = scoreSubstringHit(lower, normalizedPhrase, terms);
             if (hit.score() <= 0.0d)
@@ -134,6 +134,21 @@ public class SearchService
 
         results.sort(Comparator.comparingDouble(SearchResult::getScore).reversed());
         return results.stream().limit(limit).toList();
+    }
+
+    /**
+     * Substring fallback searches body text and always includes the path so file-name-only
+     * documents still match short queries that bypass the inverted index.
+     */
+    private static String substringSearchBody(DocumentRecord document)
+    {
+        String content = document.getContent();
+        String path = document.getPath();
+        if (content != null && !content.isBlank())
+        {
+            return content + "\n" + path;
+        }
+        return path;
     }
 
     private SubstringHit scoreSubstringHit(String bodyLower, String normalizedPhrase, List<String> terms)

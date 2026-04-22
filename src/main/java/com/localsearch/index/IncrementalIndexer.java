@@ -46,14 +46,11 @@ public class IncrementalIndexer
             }
 
             String content = readContent(latest.getPath());
-            if (content != null)
-            {
-                finalDocuments.add(new DocumentRecord(
-                        idGenerator.getAndIncrement(),
-                        path,
-                        content,
-                        latest.getLastModified()));
-            }
+            finalDocuments.add(new DocumentRecord(
+                    idGenerator.getAndIncrement(),
+                    path,
+                    content,
+                    latest.getLastModified()));
         }
 
         return indexBuilder.build(finalDocuments);

@@ -16,8 +16,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class FileCrawler
 {
     /**
-     * Indexed files (case-insensitive suffix). Text is read as UTF-8; PDF / Office formats use parsers.
-     * Nested folders are walked recursively.
+     * Extensions whose contents are parsed for full-text indexing (case-insensitive suffix).
+     * UTF-8 text; PDF / Office use dedicated parsers. Any other regular file is still listed and
+     * indexed by file name (and path) only — contents are not read.
      */
     private static final List<String> SUPPORTED_EXTENSIONS = List.of(
             ".pdf",
@@ -64,13 +65,10 @@ public class FileCrawler
         for (Path path : crawlPaths(rootDirectory))
         {
             String content = readContent(path);
-            if (content != null)
-            {
-                files.add(new CrawledFile(
-                        path,
-                        Files.getLastModifiedTime(path).toMillis(),
-                        content));
-            }
+            files.add(new CrawledFile(
+                    path,
+                    Files.getLastModifiedTime(path).toMillis(),
+                    content));
         }
         return files;
     }
@@ -92,18 +90,47 @@ public class FileCrawler
         return files;
     }
 
+    /**
+     * Full document text for supported formats; empty string when we only index the file name
+     * (unknown extension or failed extraction). Never null.
+     */
     public String readContent(Path path)
     {
-        if (!isIndexedFile(path))
+        if (path == null || path.getFileName() == null)
         {
-            return null;
+            return "";
         }
-        return DocumentTextExtractor.readPlainText(path);
+        if (!hasScannableContentExtension(path))
+        {
+            return "";
+        }
+        String extracted = DocumentTextExtractor.readPlainText(path);
+        return extracted != null ? extracted : "";
     }
 
+    /**
+     * True for regular files that appear in the index (any extension under the crawl rules).
+     */
     public boolean isIndexedFile(Path path)
     {
-        return isIndexedFileSuffix(path);
+        if (path == null || path.getFileName() == null)
+        {
+            return false;
+        }
+        try
+        {
+            return Files.isRegularFile(path);
+        }
+        catch (SecurityException ignored)
+        {
+            return false;
+        }
+    }
+
+    /** True if we attempt to read and parse file contents for full-text indexing. */
+    public boolean hasScannableContentExtension(Path path)
+    {
+        return hasScannableContentExtensionInternal(path);
     }
 
     private List<Path> crawlPaths(Path rootDirectory) throws IOException
@@ -125,7 +152,7 @@ public class FileCrawler
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
             {
-                if (isIndexedFile(file))
+                if (attrs.isRegularFile() && isIndexableFilePath(file))
                 {
                     paths.add(file);
                 }
@@ -135,8 +162,21 @@ public class FileCrawler
         return paths;
     }
 
-    private boolean isIndexedFileSuffix(Path path)
+    private boolean isIndexableFilePath(Path path)
     {
+        if (path.getFileName() == null)
+        {
+            return false;
+        }
+        return !path.getFileName().toString().isEmpty();
+    }
+
+    private boolean hasScannableContentExtensionInternal(Path path)
+    {
+        if (path.getFileName() == null)
+        {
+            return false;
+        }
         String fileName = path.getFileName().toString().toLowerCase();
         return SUPPORTED_EXTENSIONS.stream().anyMatch(fileName::endsWith);
     }

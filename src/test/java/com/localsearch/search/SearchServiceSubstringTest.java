@@ -43,4 +43,19 @@ class SearchServiceSubstringTest
         assertFalse(results.isEmpty());
         assertEquals("a.txt", results.get(0).getDocument().getPath());
     }
+
+    @Test
+    void shortQueryMatchesFileNameWhenBodyIsEmpty()
+    {
+        long now = System.currentTimeMillis();
+        DocumentRecord onlyName = new DocumentRecord(1, "/proj/icons/app.ico", "", now);
+        DocumentRecord other = new DocumentRecord(2, "/proj/readme.txt", "nothing", now);
+        InvertedIndex index = new IndexBuilder(new Tokenizer()).build(List.of(onlyName, other));
+        SearchService service = new SearchService(new Tokenizer(), new Ranker());
+
+        List<SearchResult> results = service.search(index, "app", 5);
+
+        assertFalse(results.isEmpty());
+        assertEquals("/proj/icons/app.ico", results.get(0).getDocument().getPath());
+    }
 }

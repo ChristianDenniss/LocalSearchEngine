@@ -103,8 +103,8 @@ public class LocalSearchEngineApp
         if (index.getTotalDocuments() == 0)
         {
             System.out.println("No indexable files found under: " + options.getRootDirectory());
-            System.out.println("Supported extensions: " + FileCrawler.supportedExtensionsSummary());
-            System.out.println("(Folders are scanned recursively; only files with these suffixes are indexed.)");
+            System.out.println("Full-text extensions: " + FileCrawler.supportedExtensionsSummary());
+            System.out.println("(All other regular files are indexed by file name and path only; folders are walked recursively.)");
         }
         return index;
     }
