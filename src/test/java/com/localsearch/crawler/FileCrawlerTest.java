@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FileCrawlerTest
@@ -70,5 +71,20 @@ class FileCrawlerTest
                 .findFirst()
                 .orElseThrow();
         assertTrue(sketch.getContent().isEmpty());
+    }
+
+    @Test
+    void skipsExplicitExcludedPath() throws IOException
+    {
+        Path indexFile = tempDir.resolve("index.dat");
+        Path doc = tempDir.resolve("readme.txt");
+        Files.writeString(indexFile, "fake index bytes");
+        Files.writeString(doc, "hello");
+
+        List<DocumentRecord> documents = new FileCrawler(indexFile).crawl(tempDir);
+
+        assertEquals(1, documents.size());
+        assertEquals(doc.toString(), documents.get(0).getPath());
+        assertFalse(documents.stream().anyMatch(d -> d.getPath().equals(indexFile.toString())));
     }
 }

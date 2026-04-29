@@ -84,14 +84,14 @@ public class LocalSearchEngineApp
 
         Path indexFile = options.getIndexFile();
         IndexPersistence persistence = new IndexPersistence();
-        FileCrawler fileCrawler = new FileCrawler();
+        FileCrawler fileCrawler = new FileCrawler(indexFile.toAbsolutePath().normalize());
 
         InvertedIndex index;
         if (options.isReindex() || !persistence.exists(indexFile))
         {
             if (logProgress)
             {
-                System.out.println("Building index from root directory: " + options.getRootDirectory());
+                System.out.println("\nBuilding a new index (full scan): " + options.getRootDirectory());
             }
             List<DocumentRecord> documents = fileCrawler.crawl(options.getRootDirectory());
             index = new IndexBuilder(tokenizer, embeddingProvider).build(documents);
@@ -102,7 +102,8 @@ public class LocalSearchEngineApp
             // add new files, remove deleted files, and re-read changed files only.
             if (logProgress)
             {
-                System.out.println("Syncing index with current files in: " + options.getRootDirectory());
+                System.out.println("\nUpdating saved index (checking for new, removed, or changed files only): "
+                        + options.getRootDirectory());
             }
             InvertedIndex existingIndex = persistence.load(indexFile);
             index = new IncrementalIndexer(fileCrawler, tokenizer).reindex(options.getRootDirectory(), existingIndex);
@@ -115,7 +116,7 @@ public class LocalSearchEngineApp
         persistence.save(indexFile, index);
         if (logProgress)
         {
-            System.out.println("Indexed " + index.getTotalDocuments() + " document(s). Saved to: " + indexFile);
+            System.out.println("Index ready: " + index.getTotalDocuments() + " document(s). Saved to: " + indexFile);
         }
         if (index.getTotalDocuments() == 0)
         {
@@ -174,7 +175,7 @@ public class LocalSearchEngineApp
         System.out.println("  search \"keyword only\" --no-graph");
         System.out.println("  search --reindex --root ./docs \"system design\"");
         System.out.println("  interactive input: volleyball stats --limit 10 --explain");
-        System.out.println("  interactive input: list");
+        System.out.println("  interactive input: list   (or cmds, flags, help)");
     }
 
     private void ensureRootFolderExists(Path rootDirectory) throws IOException
@@ -194,10 +195,9 @@ public class LocalSearchEngineApp
             throws IOException, ClassNotFoundException
     {
         interactiveTipShown = false;
-        System.out.println("Interactive mode started.");
         System.out.println("Default search folder: " + defaultSearchRoot);
-        System.out.println("Type your query without quotes. Example: volleyball stats --limit 10 --explain");
-        printInteractiveCommands();
+        System.out.println("Type your query without quotes | cmds for list of cmds");
+        System.out.println();
 
         @SuppressWarnings("resource")
         Scanner scanner = new Scanner(System.in);
@@ -227,6 +227,11 @@ public class LocalSearchEngineApp
             if ("cmds".equalsIgnoreCase(line))
             {
                 printInteractiveCommands();
+                continue;
+            }
+            if ("flags".equalsIgnoreCase(line))
+            {
+                printInteractiveFlags();
                 continue;
             }
             if (line.toLowerCase(Locale.ROOT).startsWith("open "))
@@ -262,7 +267,7 @@ public class LocalSearchEngineApp
             }
             if (options.getQuery() == null || options.getQuery().isBlank())
             {
-                System.out.println("Enter a search query, or type cmds / list / help / exit.");
+                System.out.println("Enter a search query, or type cmds / flags / list / help / exit.");
                 continue;
             }
             lastResults = runSingleSearch(index, tokenizer, options, options.getRootDirectory());
@@ -414,8 +419,20 @@ public class LocalSearchEngineApp
 
     private void printInteractiveCommands()
     {
-        System.out.println("Commands: cmds, help, list, open <n>, location <n>, exit, quit");
-        System.out.println("Flags per search: --no-semantic, --no-graph, --semantic-weight <0.0-1.0>, --limit <n>, --explain");
+        System.out.println("Commands: cmds, flags, help, list, open <n>, location <n>, exit, quit");
+    }
+
+    private void printInteractiveFlags()
+    {
+        System.out.println("Flags (append to any query line, e.g. my topic --limit 10 --explain):");
+        System.out.println("  --limit <n>           Max number of results (default: 5)");
+        System.out.println("  --explain             Show score breakdown (tf-idf, recency, matched terms)");
+        System.out.println("  --reindex             Rebuild index from scratch for this run");
+        System.out.println("  --root <path>         Folder to index and search (default: ~/Documents/search bin)");
+        System.out.println("  --index <path>        Index file path (default: <root>/index.dat)");
+        System.out.println("  --no-semantic         Lexical + recency only for this query (semantic is on by default)");
+        System.out.println("  --no-graph            Turn off folder-neighbor graph boost for this query");
+        System.out.println("  --semantic-weight <x>  How much to weight vectors vs keywords, 0.0–1.0 (default: 0.3)");
     }
 
     private void maybePrintInteractiveTip(List<SearchResult> results)

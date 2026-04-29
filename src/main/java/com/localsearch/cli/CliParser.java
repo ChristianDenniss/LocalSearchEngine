@@ -31,7 +31,6 @@ public class CliParser
                 }
                 case "--explain" -> options.setExplain(true);
                 case "--reindex" -> options.setReindex(true);
-                case "--semantic" -> options.setSemantic(true);
                 case "--no-semantic" -> options.setSemantic(false);
                 case "--no-graph" -> options.setGraphExpansion(false);
                 case "--semantic-weight" ->

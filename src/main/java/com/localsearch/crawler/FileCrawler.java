@@ -16,6 +16,26 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class FileCrawler
 {
     /**
+     * Absolute path of a file to skip (e.g. the on-disk index under the search root), or null.
+     */
+    private final Path pathExcludedFromCrawl;
+
+    public FileCrawler()
+    {
+        this(null);
+    }
+
+    /**
+     * @param pathExcludedFromCrawl typically the index file path so it is never indexed as a document
+     */
+    public FileCrawler(Path pathExcludedFromCrawl)
+    {
+        this.pathExcludedFromCrawl = pathExcludedFromCrawl == null
+                ? null
+                : pathExcludedFromCrawl.toAbsolutePath().normalize();
+    }
+
+    /**
      * Extensions whose contents are parsed for full-text indexing (case-insensitive suffix).
      * UTF-8 text; PDF / Office use dedicated parsers. Any other regular file is still listed and
      * indexed by file name (and path) only — contents are not read.
@@ -152,7 +172,7 @@ public class FileCrawler
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
             {
-                if (attrs.isRegularFile() && isIndexableFilePath(file))
+                if (attrs.isRegularFile() && isIndexableFilePath(file) && !isExcludedFromCrawl(file))
                 {
                     paths.add(file);
                 }
@@ -169,6 +189,22 @@ public class FileCrawler
             return false;
         }
         return !path.getFileName().toString().isEmpty();
+    }
+
+    private boolean isExcludedFromCrawl(Path file)
+    {
+        if (pathExcludedFromCrawl == null)
+        {
+            return false;
+        }
+        try
+        {
+            return Files.isSameFile(file, pathExcludedFromCrawl);
+        }
+        catch (IOException ignored)
+        {
+            return file.toAbsolutePath().normalize().equals(pathExcludedFromCrawl);
+        }
     }
 
     private boolean hasScannableContentExtensionInternal(Path path)

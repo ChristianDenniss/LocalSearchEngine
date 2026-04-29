@@ -20,6 +20,10 @@ import java.util.Set;
 public class SearchService
 {
     private static final int SUBSTRING_SCORE_CAP = 80;
+    /** Drop hits weaker than this fraction of the top score (after sorting by final score). */
+    private static final double MIN_SCORE_RATIO_OF_TOP = 0.34d;
+    /** Also require at least this final score so semantic/graph noise does not flood results. */
+    private static final double MIN_SCORE_ABSOLUTE = 0.12d;
 
     private final Tokenizer tokenizer;
     private final Ranker ranker;
@@ -132,7 +136,7 @@ public class SearchService
         }
 
         results.sort(Comparator.comparingDouble(SearchResult::getScore).reversed());
-        return results.stream().limit(limit).toList();
+        return applyScoreQualityGate(results, limit);
     }
 
     private boolean shouldUseSubstringOnly(String normalizedPhrase, List<String> terms)
@@ -174,7 +178,7 @@ public class SearchService
         }
 
         results.sort(Comparator.comparingDouble(SearchResult::getScore).reversed());
-        return results.stream().limit(limit).toList();
+        return applyScoreQualityGate(results, limit);
     }
 
     /**
@@ -376,5 +380,37 @@ public class SearchService
             }
         }
         return graphBoost;
+    }
+
+    /**
+     * Keeps only results whose final score is close enough to the best hit, so weak semantic/graph
+     * tails and unrelated files do not clutter the list.
+     */
+    private static List<SearchResult> applyScoreQualityGate(List<SearchResult> sortedDescending, int limit)
+    {
+        if (sortedDescending.isEmpty())
+        {
+            return sortedDescending;
+        }
+        double top = sortedDescending.get(0).getScore();
+        if (top <= 0.0d)
+        {
+            return sortedDescending.stream().limit(limit).toList();
+        }
+        double floor = Math.max(top * MIN_SCORE_RATIO_OF_TOP, MIN_SCORE_ABSOLUTE);
+        List<SearchResult> kept = new ArrayList<>();
+        for (SearchResult result : sortedDescending)
+        {
+            if (result.getScore() < floor)
+            {
+                break;
+            }
+            kept.add(result);
+            if (kept.size() >= limit)
+            {
+                break;
+            }
+        }
+        return List.copyOf(kept);
     }
 }

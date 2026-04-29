@@ -12,8 +12,10 @@ A plain Java CLI search engine that indexes UTF-8 text files plus common **PDF**
 - Offline **relationship graph** (same parent folder) is built at index time; at query time neighbors of strong hits get a small score boost (disable with `--no-graph`)
 - Applies recency boosting
 - Generates snippets with matched term highlighting
-- Syncs index incrementally on startup (add/remove/update awareness)
-- In interactive mode, re-syncs from disk before every search and `list`, so new files are indexed without restarting
+- On each run it **updates** the saved index incrementally (not a full rebuild unless you use `--reindex` or the index file is missing): it checks the folder for new, removed, or changed files only
+- The **index file itself** (e.g. `index.dat`) is never crawled as a document, even when it lives under the search folder
+- Search results drop **very weak** hits compared to the best score so unrelated files do not fill the list
+- In interactive mode, it does that same quick update before every search and `list`, so new files show up without restarting
 - `list` command prints all indexed file paths
 
 ## Default behavior
@@ -66,6 +68,10 @@ Crawler ignores:
   - `mvn clean package`
 - Run tests:
   - `mvn test`
+
+## Console and PDFs
+
+Some PDFs trigger Apache PDFBox warnings about embedded font names (for example “No PostScript name data…”). Those messages are technical noise and rarely affect extracted text, so the app **filters that specific line** from console output.
 
 ## More details
 
