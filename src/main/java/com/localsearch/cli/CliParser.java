@@ -31,6 +31,14 @@ public class CliParser
                 }
                 case "--explain" -> options.setExplain(true);
                 case "--reindex" -> options.setReindex(true);
+                case "--semantic" -> options.setSemantic(true);
+                case "--no-semantic" -> options.setSemantic(false);
+                case "--semantic-weight" ->
+                {
+                    i++;
+                    ensureValue(args, i, "--semantic-weight");
+                    options.setSemanticWeight(Double.parseDouble(args[i]));
+                }
                 case "--root" ->
                 {
                     i++;

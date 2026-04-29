@@ -20,6 +20,7 @@ implements Serializable
     private final Map<String, List<Posting>> postingsByTerm = new HashMap<>();
     private final Map<String, Integer> documentFrequencyByTerm = new HashMap<>();
     private final Map<Integer, DocumentRecord> documentsById = new HashMap<>();
+    private final Map<Integer, float[]> semanticVectorsByDocId = new HashMap<>();
     private int totalDocuments;
 
     public void addPosting(String term, Posting posting)
@@ -65,5 +66,25 @@ implements Serializable
     public void setTotalDocuments(int totalDocuments)
     {
         this.totalDocuments = totalDocuments;
+    }
+
+    public void setSemanticVector(int docId, float[] vector)
+    {
+        if (vector == null)
+        {
+            semanticVectorsByDocId.remove(docId);
+            return;
+        }
+        semanticVectorsByDocId.put(docId, vector);
+    }
+
+    public float[] getSemanticVector(int docId)
+    {
+        return semanticVectorsByDocId.get(docId);
+    }
+
+    public Map<Integer, float[]> getSemanticVectorsByDocId()
+    {
+        return Collections.unmodifiableMap(semanticVectorsByDocId);
     }
 }

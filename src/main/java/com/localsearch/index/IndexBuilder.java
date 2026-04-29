@@ -2,6 +2,7 @@ package com.localsearch.index;
 
 import com.localsearch.model.DocumentRecord;
 import com.localsearch.model.Posting;
+import com.localsearch.semantic.EmbeddingProvider;
 import com.localsearch.util.Tokenizer;
 
 import java.nio.file.Path;
@@ -16,10 +17,17 @@ public class IndexBuilder
     private static final int FILENAME_TOKEN_BOOST = 3;
 
     private final Tokenizer tokenizer;
+    private final EmbeddingProvider embeddingProvider;
 
     public IndexBuilder(Tokenizer tokenizer)
     {
+        this(tokenizer, null);
+    }
+
+    public IndexBuilder(Tokenizer tokenizer, EmbeddingProvider embeddingProvider)
+    {
         this.tokenizer = tokenizer;
+        this.embeddingProvider = embeddingProvider;
     }
 
     public InvertedIndex build(List<DocumentRecord> documents)
@@ -30,6 +38,11 @@ public class IndexBuilder
         for (DocumentRecord document : documents)
         {
             index.addDocument(document);
+            if (embeddingProvider != null)
+            {
+                String semanticBody = semanticBody(document);
+                index.setSemanticVector(document.getId(), embeddingProvider.embed(semanticBody));
+            }
             List<String> tokens = tokenizer.tokenizeForIndexing(document.getContent());
             Map<String, Integer> termFrequency = new HashMap<>();
             for (String token : tokens)
@@ -57,6 +70,12 @@ public class IndexBuilder
         }
         index.setTotalDocuments(documents.size());
         return index;
+    }
+
+    private static String semanticBody(DocumentRecord document)
+    {
+        String content = document.getContent() == null ? "" : document.getContent();
+        return document.getPath() + "\n" + content;
     }
 
     private List<String> tokenizeFileName(String pathString)

@@ -8,7 +8,10 @@ import com.localsearch.index.InvertedIndex;
 import com.localsearch.model.DocumentRecord;
 import com.localsearch.model.SearchResult;
 import com.localsearch.ranking.Ranker;
+import com.localsearch.search.SemanticSearchConfig;
 import com.localsearch.search.SearchService;
+import com.localsearch.semantic.EmbeddingProvider;
+import com.localsearch.semantic.HashingEmbeddingProvider;
 import com.localsearch.util.SnippetGenerator;
 import com.localsearch.util.Tokenizer;
 
@@ -47,9 +50,14 @@ public class LocalSearchEngineApp
         {
             throw new IllegalArgumentException("--limit must be greater than 0");
         }
+        if (options.getSemanticWeight() < 0.0d || options.getSemanticWeight() > 1.0d)
+        {
+            throw new IllegalArgumentException("--semantic-weight must be between 0 and 1");
+        }
 
         Tokenizer tokenizer = new Tokenizer();
-        InvertedIndex index = prepareIndex(options, tokenizer, true);
+        EmbeddingProvider embeddingProvider = options.isSemantic() ? new HashingEmbeddingProvider(tokenizer) : null;
+        InvertedIndex index = prepareIndex(options, tokenizer, embeddingProvider, true);
         if (options.isListIndexed())
         {
             printIndexedDocuments(index, options.getRootDirectory());
@@ -64,7 +72,11 @@ public class LocalSearchEngineApp
         runSingleSearch(index, tokenizer, options, options.getRootDirectory());
     }
 
-    private InvertedIndex prepareIndex(CliOptions options, Tokenizer tokenizer, boolean logProgress)
+    private InvertedIndex prepareIndex(
+            CliOptions options,
+            Tokenizer tokenizer,
+            EmbeddingProvider embeddingProvider,
+            boolean logProgress)
             throws IOException, ClassNotFoundException
     {
         ensureRootFolderExists(options.getRootDirectory());
@@ -81,7 +93,7 @@ public class LocalSearchEngineApp
                 System.out.println("Building index from root directory: " + options.getRootDirectory());
             }
             List<DocumentRecord> documents = fileCrawler.crawl(options.getRootDirectory());
-            index = new IndexBuilder(tokenizer).build(documents);
+            index = new IndexBuilder(tokenizer, embeddingProvider).build(documents);
         }
         else
         {
@@ -93,6 +105,10 @@ public class LocalSearchEngineApp
             }
             InvertedIndex existingIndex = persistence.load(indexFile);
             index = new IncrementalIndexer(fileCrawler, tokenizer).reindex(options.getRootDirectory(), existingIndex);
+            if (embeddingProvider != null)
+            {
+                index = new IndexBuilder(tokenizer, embeddingProvider).build(new ArrayList<>(index.getDocumentsById().values()));
+            }
         }
 
         persistence.save(indexFile, index);
@@ -143,7 +159,7 @@ public class LocalSearchEngineApp
     private void printUsage()
     {
         System.out.println("Usage:");
-        System.out.println("  search \"query string\" [--limit N] [--explain] [--reindex] [--root PATH] [--index PATH]");
+        System.out.println("  search \"query string\" [--limit N] [--explain] [--no-semantic] [--semantic-weight 0.0-1.0] [--reindex] [--root PATH] [--index PATH]");
         System.out.println("  search  (starts interactive mode)");
         System.out.println("  search list [--root PATH] [--index PATH] [--reindex]  (print all indexed file paths)");
         System.out.println("  default root: ~/Documents/search bin\n");
@@ -151,6 +167,9 @@ public class LocalSearchEngineApp
         System.out.println("  search \"volleyball stats\"");
         System.out.println("  search \"resume\" --limit 10");
         System.out.println("  search \"john doe\" --explain");
+        System.out.println("  search \"project summary\"  (semantic is on by default)");
+        System.out.println("  search \"benefits package\" --semantic-weight 0.45");
+        System.out.println("  search \"exact token lookup\" --no-semantic");
         System.out.println("  search --reindex --root ./docs \"system design\"");
         System.out.println("  interactive input: volleyball stats --limit 10 --explain");
         System.out.println("  interactive input: list");
@@ -226,8 +245,14 @@ public class LocalSearchEngineApp
                 System.out.println("Error: --limit must be greater than 0");
                 continue;
             }
+            if (options.getSemanticWeight() < 0.0d || options.getSemanticWeight() > 1.0d)
+            {
+                System.out.println("Error: --semantic-weight must be between 0 and 1");
+                continue;
+            }
 
-            index = prepareIndex(options, tokenizer, false);
+            EmbeddingProvider embeddingProvider = options.isSemantic() ? new HashingEmbeddingProvider(tokenizer) : null;
+            index = prepareIndex(options, tokenizer, embeddingProvider, false);
             if (options.isListIndexed())
             {
                 printIndexedDocuments(index, options.getRootDirectory());
@@ -249,6 +274,15 @@ public class LocalSearchEngineApp
             Path rootDirectory)
     {
         SearchService searchService = new SearchService(tokenizer, new Ranker());
+        if (options.isSemantic())
+        {
+            double semanticWeight = options.getSemanticWeight();
+            double lexicalWeight = 1.0d - semanticWeight;
+            searchService = new SearchService(
+                    tokenizer,
+                    new Ranker(),
+                    new SemanticSearchConfig(true, lexicalWeight, semanticWeight, 0.15d));
+        }
         List<SearchResult> results = searchService.search(index, options.getQuery(), options.getLimit());
         printResults(results, tokenizer.tokenize(options.getQuery()), options.isExplain(), rootDirectory);
         maybePrintInteractiveTip(results);
@@ -382,6 +416,7 @@ public class LocalSearchEngineApp
     private void printInteractiveCommands()
     {
         System.out.println("Commands: cmds, help, list, open <n>, location <n>, exit, quit");
+        System.out.println("Flags per search: --no-semantic, --semantic-weight <0.0-1.0>, --limit <n>, --explain");
     }
 
     private void maybePrintInteractiveTip(List<SearchResult> results)

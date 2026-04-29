@@ -8,6 +8,7 @@ A plain Java CLI search engine that indexes UTF-8 text files plus common **PDF**
 - Builds an in-memory inverted index
 - Persists index data to disk
 - Supports keyword search with ranking
+- Semantic retrieval is on by default (disable per-search with `--no-semantic`)
 - Applies recency boosting
 - Generates snippets with matched term highlighting
 - Syncs index incrementally on startup (add/remove/update awareness)
@@ -45,6 +46,10 @@ Document score combines:
 Final score:
 
 - `score = tfIdf + recencyBoost`
+
+With semantic mode (default):
+
+- `score = (lexicalWeight * log(1 + tfIdf) + semanticWeight * cosineSimilarity) + recencyBoost`
 
 ## Ignore rules
 

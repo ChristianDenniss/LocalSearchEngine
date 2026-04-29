@@ -2,6 +2,8 @@ com\localsearch\cli\CliParser.class
 com\localsearch\util\SnippetGenerator.class
 com\localsearch\index\IndexBuilder.class
 com\localsearch\index\IndexPersistence.class
+com\localsearch\semantic\EmbeddingProvider.class
+com\localsearch\semantic\VectorMath.class
 com\localsearch\index\package-info.class
 com\localsearch\model\Posting.class
 com\localsearch\index\InvertedIndex.class
@@ -13,8 +15,10 @@ com\localsearch\crawler\CrawledFile.class
 com\localsearch\index\IncrementalIndexer.class
 com\localsearch\crawler\FileCrawler.class
 com\localsearch\search\SearchService.class
+com\localsearch\search\SemanticSearchConfig.class
 com\localsearch\cli\package-info.class
 com\localsearch\util\DocumentTextExtractor.class
+com\localsearch\semantic\HashingEmbeddingProvider.class
 com\localsearch\cli\LocalSearchEngineApp.class
 com\localsearch\model\DocumentRecord.class
 com\localsearch\model\package-info.class
@@ -23,4 +27,5 @@ com\localsearch\search\package-info.class
 com\localsearch\util\package-info.class
 com\localsearch\model\SearchResult.class
 com\localsearch\cli\CliOptions.class
+com\localsearch\semantic\package-info.class
 com\localsearch\search\SearchService$SubstringHit.class

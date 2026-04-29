@@ -5,6 +5,7 @@ import com.localsearch.model.DocumentRecord;
 import com.localsearch.model.Posting;
 import com.localsearch.model.SearchResult;
 import com.localsearch.ranking.Ranker;
+import com.localsearch.semantic.VectorMath;
 import com.localsearch.util.Tokenizer;
 
 import java.util.ArrayList;
@@ -20,11 +21,18 @@ public class SearchService
 
     private final Tokenizer tokenizer;
     private final Ranker ranker;
+    private final SemanticSearchConfig semanticConfig;
 
     public SearchService(Tokenizer tokenizer, Ranker ranker)
     {
+        this(tokenizer, ranker, SemanticSearchConfig.DISABLED);
+    }
+
+    public SearchService(Tokenizer tokenizer, Ranker ranker, SemanticSearchConfig semanticConfig)
+    {
         this.tokenizer = tokenizer;
         this.ranker = ranker;
+        this.semanticConfig = semanticConfig;
     }
 
     public List<SearchResult> search(InvertedIndex index, String query, int limit)
@@ -69,25 +77,38 @@ public class SearchService
             }
         }
 
-        if (lexicalScores.isEmpty() && normalizedPhrase.length() >= 2)
+        Map<Integer, Double> semanticScores = semanticScores(index, query);
+        if (lexicalScores.isEmpty() && semanticScores.isEmpty() && normalizedPhrase.length() >= 2)
         {
             return substringSearch(index, normalizedPhrase, terms, limit);
         }
-
         long now = System.currentTimeMillis();
         List<SearchResult> results = new ArrayList<>();
-        for (Map.Entry<Integer, Double> entry : lexicalScores.entrySet())
+        List<Integer> candidateDocIds = semanticConfig.isEnabled()
+                ? unionCandidates(lexicalScores, semanticScores)
+                : new ArrayList<>(lexicalScores.keySet());
+        for (Integer docId : candidateDocIds)
         {
-            int docId = entry.getKey();
             DocumentRecord document = index.getDocument(docId);
             if (document == null)
             {
                 continue;
             }
-            double tfIdfScore = entry.getValue();
+            double tfIdfScore = lexicalScores.getOrDefault(docId, 0.0d);
+            double semanticScore = semanticScores.getOrDefault(docId, 0.0d);
+            double retrievalScore = hybridScore(tfIdfScore, semanticScore);
+            if (retrievalScore <= 0.0d)
+            {
+                continue;
+            }
             double recencyBoost = ranker.recencyBoost(document, now);
-            double totalScore = tfIdfScore + recencyBoost;
-            results.add(new SearchResult(document, totalScore, tfIdfScore, recencyBoost, termMatchesPerDoc.get(docId)));
+            double totalScore = retrievalScore + recencyBoost;
+            results.add(new SearchResult(
+                    document,
+                    totalScore,
+                    tfIdfScore,
+                    recencyBoost,
+                    termMatchesPerDoc.getOrDefault(docId, Map.of())));
         }
 
         results.sort(Comparator.comparingDouble(SearchResult::getScore).reversed());
@@ -218,5 +239,69 @@ public class SearchService
 
     private record SubstringHit(double score, Map<String, Integer> matchedTerms)
     {
+    }
+
+    private Map<Integer, Double> semanticScores(InvertedIndex index, String query)
+    {
+        if (!semanticConfig.isEnabled() || index.getSemanticVectorsByDocId().isEmpty())
+        {
+            return Map.of();
+        }
+
+        float[] queryVector = index.getSemanticVectorsByDocId().values().stream().findFirst().map(v -> new float[v.length]).orElse(null);
+        if (queryVector == null)
+        {
+            return Map.of();
+        }
+
+        // Reuse tokenizer normalization to keep query handling aligned with lexical indexing.
+        for (String token : tokenizer.tokenizeForIndexing(query))
+        {
+            int hash = token.hashCode();
+            int slot = Math.floorMod(hash, queryVector.length);
+            float direction = ((hash >>> 1) & 1) == 0 ? 1.0f : -1.0f;
+            queryVector[slot] += direction;
+        }
+        VectorMath.normalizeInPlace(queryVector);
+        if (VectorMath.cosineSimilarity(queryVector, queryVector) == 0.0d)
+        {
+            return Map.of();
+        }
+
+        Map<Integer, Double> scores = new HashMap<>();
+        for (Map.Entry<Integer, float[]> entry : index.getSemanticVectorsByDocId().entrySet())
+        {
+            double cosine = VectorMath.cosineSimilarity(queryVector, entry.getValue());
+            if (cosine >= semanticConfig.getSemanticThreshold())
+            {
+                scores.put(entry.getKey(), cosine);
+            }
+        }
+        return scores;
+    }
+
+    private List<Integer> unionCandidates(Map<Integer, Double> lexicalScores, Map<Integer, Double> semanticScores)
+    {
+        Map<Integer, Boolean> ids = new HashMap<>();
+        for (Integer docId : lexicalScores.keySet())
+        {
+            ids.put(docId, Boolean.TRUE);
+        }
+        for (Integer docId : semanticScores.keySet())
+        {
+            ids.put(docId, Boolean.TRUE);
+        }
+        return new ArrayList<>(ids.keySet());
+    }
+
+    private double hybridScore(double lexicalScore, double semanticScore)
+    {
+        if (!semanticConfig.isEnabled())
+        {
+            return lexicalScore;
+        }
+        double lexicalNormalized = lexicalScore > 0.0d ? Math.log1p(lexicalScore) : 0.0d;
+        return (semanticConfig.getLexicalWeight() * lexicalNormalized)
+                + (semanticConfig.getSemanticWeight() * semanticScore);
     }
 }

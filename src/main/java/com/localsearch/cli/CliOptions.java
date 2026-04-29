@@ -12,6 +12,8 @@ public class CliOptions
     private boolean explain;
     private boolean reindex;
     private boolean listIndexed;
+    private boolean semantic = true;
+    private double semanticWeight = 0.30d;
     private Path rootDirectory = defaultRootDirectory();
     private Path indexFile = defaultRootDirectory().resolve("index.dat").toAbsolutePath().normalize();
 
@@ -83,6 +85,26 @@ public class CliOptions
     public void setIndexFile(Path indexFile)
     {
         this.indexFile = indexFile.toAbsolutePath().normalize();
+    }
+
+    public boolean isSemantic()
+    {
+        return semantic;
+    }
+
+    public void setSemantic(boolean semantic)
+    {
+        this.semantic = semantic;
+    }
+
+    public double getSemanticWeight()
+    {
+        return semanticWeight;
+    }
+
+    public void setSemanticWeight(double semanticWeight)
+    {
+        this.semanticWeight = semanticWeight;
     }
 
     private static Path defaultRootDirectory()
