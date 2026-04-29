@@ -175,7 +175,7 @@ public class LocalSearchEngineApp
         System.out.println("  search \"keyword only\" --no-graph");
         System.out.println("  search --reindex --root ./docs \"system design\"");
         System.out.println("  interactive input: volleyball stats --limit 10 --explain");
-        System.out.println("  interactive input: list   (or cmds, flags, help)");
+        System.out.println("  interactive input: list   (or clear, cmds, flags, help)");
     }
 
     private void ensureRootFolderExists(Path rootDirectory) throws IOException
@@ -234,6 +234,11 @@ public class LocalSearchEngineApp
                 printInteractiveFlags();
                 continue;
             }
+            if ("clear".equalsIgnoreCase(line) || "cls".equalsIgnoreCase(line))
+            {
+                clearInteractiveConsole();
+                continue;
+            }
             if (line.toLowerCase(Locale.ROOT).startsWith("open "))
             {
                 openResult(line, lastResults);
@@ -267,7 +272,7 @@ public class LocalSearchEngineApp
             }
             if (options.getQuery() == null || options.getQuery().isBlank())
             {
-                System.out.println("Enter a search query, or type cmds / flags / list / help / exit.");
+                System.out.println("Enter a search query, or type cmds / flags / clear / list / help / exit.");
                 continue;
             }
             lastResults = runSingleSearch(index, tokenizer, options, options.getRootDirectory());
@@ -419,7 +424,31 @@ public class LocalSearchEngineApp
 
     private void printInteractiveCommands()
     {
-        System.out.println("Commands: cmds, flags, help, list, open <n>, location <n>, exit, quit");
+        System.out.println("Commands: clear, cmds, flags, help, list, open <n>, location <n>, exit, quit");
+    }
+
+    /** Same idea as the shell `clear` / Windows `cls`: wipe the terminal scrollback for this session. */
+    private static void clearInteractiveConsole()
+    {
+        try
+        {
+            if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win"))
+            {
+                new ProcessBuilder("cmd", "/c", "cls").inheritIO().start().waitFor();
+            }
+            else
+            {
+                System.out.print("\033[3J\033[2J\033[H");
+                System.out.flush();
+            }
+        }
+        catch (Exception ignored)
+        {
+            for (int i = 0; i < 60; i++)
+            {
+                System.out.println();
+            }
+        }
     }
 
     private void printInteractiveFlags()
