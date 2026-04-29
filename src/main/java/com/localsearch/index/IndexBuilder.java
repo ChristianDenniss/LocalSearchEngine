@@ -69,6 +69,7 @@ public class IndexBuilder
             index.setDocumentFrequency(entry.getKey(), entry.getValue().size());
         }
         index.setTotalDocuments(documents.size());
+        DocumentRelationshipGraph.attachToIndex(index, documents);
         return index;
     }
 

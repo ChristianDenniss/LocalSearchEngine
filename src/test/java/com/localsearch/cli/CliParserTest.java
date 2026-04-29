@@ -47,4 +47,16 @@ class CliParserTest
 
         assertFalse(options.isSemantic());
     }
+
+    @Test
+    void disablesGraphExpansionWhenNoGraphFlagIsPresent()
+    {
+        CliOptions options = new CliParser().parse(new String[] {
+                "search",
+                "benefits",
+                "--no-graph",
+        });
+
+        assertFalse(options.isGraphExpansion());
+    }
 }

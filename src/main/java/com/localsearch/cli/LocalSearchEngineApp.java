@@ -8,6 +8,7 @@ import com.localsearch.index.InvertedIndex;
 import com.localsearch.model.DocumentRecord;
 import com.localsearch.model.SearchResult;
 import com.localsearch.ranking.Ranker;
+import com.localsearch.search.GraphRetrievalConfig;
 import com.localsearch.search.SemanticSearchConfig;
 import com.localsearch.search.SearchService;
 import com.localsearch.semantic.EmbeddingProvider;
@@ -159,7 +160,7 @@ public class LocalSearchEngineApp
     private void printUsage()
     {
         System.out.println("Usage:");
-        System.out.println("  search \"query string\" [--limit N] [--explain] [--no-semantic] [--semantic-weight 0.0-1.0] [--reindex] [--root PATH] [--index PATH]");
+        System.out.println("  search \"query string\" [--limit N] [--explain] [--no-semantic] [--no-graph] [--semantic-weight 0.0-1.0] [--reindex] [--root PATH] [--index PATH]");
         System.out.println("  search  (starts interactive mode)");
         System.out.println("  search list [--root PATH] [--index PATH] [--reindex]  (print all indexed file paths)");
         System.out.println("  default root: ~/Documents/search bin\n");
@@ -170,6 +171,7 @@ public class LocalSearchEngineApp
         System.out.println("  search \"project summary\"  (semantic is on by default)");
         System.out.println("  search \"benefits package\" --semantic-weight 0.45");
         System.out.println("  search \"exact token lookup\" --no-semantic");
+        System.out.println("  search \"keyword only\" --no-graph");
         System.out.println("  search --reindex --root ./docs \"system design\"");
         System.out.println("  interactive input: volleyball stats --limit 10 --explain");
         System.out.println("  interactive input: list");
@@ -273,16 +275,13 @@ public class LocalSearchEngineApp
             CliOptions options,
             Path rootDirectory)
     {
-        SearchService searchService = new SearchService(tokenizer, new Ranker());
-        if (options.isSemantic())
-        {
-            double semanticWeight = options.getSemanticWeight();
-            double lexicalWeight = 1.0d - semanticWeight;
-            searchService = new SearchService(
-                    tokenizer,
-                    new Ranker(),
-                    new SemanticSearchConfig(true, lexicalWeight, semanticWeight, 0.15d));
-        }
+        SemanticSearchConfig semanticConfig = options.isSemantic()
+                ? new SemanticSearchConfig(true, 1.0d - options.getSemanticWeight(), options.getSemanticWeight(), 0.15d)
+                : SemanticSearchConfig.DISABLED;
+        GraphRetrievalConfig graphConfig = options.isGraphExpansion()
+                ? GraphRetrievalConfig.DEFAULT
+                : GraphRetrievalConfig.DISABLED;
+        SearchService searchService = new SearchService(tokenizer, new Ranker(), semanticConfig, graphConfig);
         List<SearchResult> results = searchService.search(index, options.getQuery(), options.getLimit());
         printResults(results, tokenizer.tokenize(options.getQuery()), options.isExplain(), rootDirectory);
         maybePrintInteractiveTip(results);
@@ -416,7 +415,7 @@ public class LocalSearchEngineApp
     private void printInteractiveCommands()
     {
         System.out.println("Commands: cmds, help, list, open <n>, location <n>, exit, quit");
-        System.out.println("Flags per search: --no-semantic, --semantic-weight <0.0-1.0>, --limit <n>, --explain");
+        System.out.println("Flags per search: --no-semantic, --no-graph, --semantic-weight <0.0-1.0>, --limit <n>, --explain");
     }
 
     private void maybePrintInteractiveTip(List<SearchResult> results)

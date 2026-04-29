@@ -5,6 +5,7 @@ C:\Users\aottg\development\personal\LocalSearchEngine\src\main\java\com\localsea
 C:\Users\aottg\development\personal\LocalSearchEngine\src\main\java\com\localsearch\crawler\CrawledFile.java
 C:\Users\aottg\development\personal\LocalSearchEngine\src\main\java\com\localsearch\crawler\FileCrawler.java
 C:\Users\aottg\development\personal\LocalSearchEngine\src\main\java\com\localsearch\crawler\package-info.java
+C:\Users\aottg\development\personal\LocalSearchEngine\src\main\java\com\localsearch\index\DocumentRelationshipGraph.java
 C:\Users\aottg\development\personal\LocalSearchEngine\src\main\java\com\localsearch\index\IncrementalIndexer.java
 C:\Users\aottg\development\personal\LocalSearchEngine\src\main\java\com\localsearch\index\IndexBuilder.java
 C:\Users\aottg\development\personal\LocalSearchEngine\src\main\java\com\localsearch\index\IndexPersistence.java
@@ -16,6 +17,7 @@ C:\Users\aottg\development\personal\LocalSearchEngine\src\main\java\com\localsea
 C:\Users\aottg\development\personal\LocalSearchEngine\src\main\java\com\localsearch\model\SearchResult.java
 C:\Users\aottg\development\personal\LocalSearchEngine\src\main\java\com\localsearch\ranking\package-info.java
 C:\Users\aottg\development\personal\LocalSearchEngine\src\main\java\com\localsearch\ranking\Ranker.java
+C:\Users\aottg\development\personal\LocalSearchEngine\src\main\java\com\localsearch\search\GraphRetrievalConfig.java
 C:\Users\aottg\development\personal\LocalSearchEngine\src\main\java\com\localsearch\search\package-info.java
 C:\Users\aottg\development\personal\LocalSearchEngine\src\main\java\com\localsearch\search\SearchService.java
 C:\Users\aottg\development\personal\LocalSearchEngine\src\main\java\com\localsearch\search\SemanticSearchConfig.java

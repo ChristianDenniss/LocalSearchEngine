@@ -16,11 +16,13 @@ com\localsearch\index\IncrementalIndexer.class
 com\localsearch\crawler\FileCrawler.class
 com\localsearch\search\SearchService.class
 com\localsearch\search\SemanticSearchConfig.class
+com\localsearch\index\DocumentRelationshipGraph.class
 com\localsearch\cli\package-info.class
 com\localsearch\util\DocumentTextExtractor.class
 com\localsearch\semantic\HashingEmbeddingProvider.class
 com\localsearch\cli\LocalSearchEngineApp.class
 com\localsearch\model\DocumentRecord.class
+com\localsearch\search\GraphRetrievalConfig.class
 com\localsearch\model\package-info.class
 com\localsearch\util\Tokenizer.class
 com\localsearch\search\package-info.class

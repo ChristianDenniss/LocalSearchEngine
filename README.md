@@ -9,6 +9,7 @@ A plain Java CLI search engine that indexes UTF-8 text files plus common **PDF**
 - Persists index data to disk
 - Supports keyword search with ranking
 - Semantic retrieval is on by default (disable per-search with `--no-semantic`)
+- Offline **relationship graph** (same parent folder) is built at index time; at query time neighbors of strong hits get a small score boost (disable with `--no-graph`)
 - Applies recency boosting
 - Generates snippets with matched term highlighting
 - Syncs index incrementally on startup (add/remove/update awareness)

@@ -11,9 +11,11 @@ import com.localsearch.util.Tokenizer;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public class SearchService
 {
@@ -22,17 +24,28 @@ public class SearchService
     private final Tokenizer tokenizer;
     private final Ranker ranker;
     private final SemanticSearchConfig semanticConfig;
+    private final GraphRetrievalConfig graphConfig;
 
     public SearchService(Tokenizer tokenizer, Ranker ranker)
     {
-        this(tokenizer, ranker, SemanticSearchConfig.DISABLED);
+        this(tokenizer, ranker, SemanticSearchConfig.DISABLED, GraphRetrievalConfig.DISABLED);
     }
 
     public SearchService(Tokenizer tokenizer, Ranker ranker, SemanticSearchConfig semanticConfig)
     {
+        this(tokenizer, ranker, semanticConfig, GraphRetrievalConfig.DEFAULT);
+    }
+
+    public SearchService(
+            Tokenizer tokenizer,
+            Ranker ranker,
+            SemanticSearchConfig semanticConfig,
+            GraphRetrievalConfig graphConfig)
+    {
         this.tokenizer = tokenizer;
         this.ranker = ranker;
         this.semanticConfig = semanticConfig;
+        this.graphConfig = graphConfig;
     }
 
     public List<SearchResult> search(InvertedIndex index, String query, int limit)
@@ -83,11 +96,16 @@ public class SearchService
             return substringSearch(index, normalizedPhrase, terms, limit);
         }
         long now = System.currentTimeMillis();
-        List<SearchResult> results = new ArrayList<>();
         List<Integer> candidateDocIds = semanticConfig.isEnabled()
                 ? unionCandidates(lexicalScores, semanticScores)
                 : new ArrayList<>(lexicalScores.keySet());
-        for (Integer docId : candidateDocIds)
+
+        Map<Integer, Double> graphBoostByDocId = graphBoostFromSeeds(index, candidateDocIds, lexicalScores, semanticScores);
+        Set<Integer> expandedDocIds = new HashSet<>(candidateDocIds);
+        expandedDocIds.addAll(graphBoostByDocId.keySet());
+
+        List<SearchResult> results = new ArrayList<>();
+        for (Integer docId : expandedDocIds)
         {
             DocumentRecord document = index.getDocument(docId);
             if (document == null)
@@ -96,7 +114,9 @@ public class SearchService
             }
             double tfIdfScore = lexicalScores.getOrDefault(docId, 0.0d);
             double semanticScore = semanticScores.getOrDefault(docId, 0.0d);
-            double retrievalScore = hybridScore(tfIdfScore, semanticScore);
+            double hybrid = hybridScore(tfIdfScore, semanticScore);
+            double graphBoost = graphBoostByDocId.getOrDefault(docId, 0.0d);
+            double retrievalScore = hybrid + graphBoost;
             if (retrievalScore <= 0.0d)
             {
                 continue;
@@ -303,5 +323,58 @@ public class SearchService
         double lexicalNormalized = lexicalScore > 0.0d ? Math.log1p(lexicalScore) : 0.0d;
         return (semanticConfig.getLexicalWeight() * lexicalNormalized)
                 + (semanticConfig.getSemanticWeight() * semanticScore);
+    }
+
+    private Map<Integer, Double> graphBoostFromSeeds(
+            InvertedIndex index,
+            List<Integer> candidateDocIds,
+            Map<Integer, Double> lexicalScores,
+            Map<Integer, Double> semanticScores)
+    {
+        if (!graphConfig.isEnabled() || index.getNeighborDocIdsByDocId().isEmpty())
+        {
+            return Map.of();
+        }
+
+        Map<Integer, Double> hybridByDocId = new HashMap<>();
+        for (Integer docId : candidateDocIds)
+        {
+            double hybrid = hybridScore(
+                    lexicalScores.getOrDefault(docId, 0.0d),
+                    semanticScores.getOrDefault(docId, 0.0d));
+            if (hybrid > 0.0d)
+            {
+                hybridByDocId.put(docId, hybrid);
+            }
+        }
+        if (hybridByDocId.isEmpty())
+        {
+            return Map.of();
+        }
+
+        int maxSeeds = Math.max(1, graphConfig.getMaxSeeds());
+        List<Integer> seeds = hybridByDocId.entrySet().stream()
+                .sorted(Comparator.comparingDouble(Map.Entry<Integer, Double>::getValue).reversed())
+                .limit(maxSeeds)
+                .map(Map.Entry::getKey)
+                .toList();
+
+        double factor = graphConfig.getNeighborBoostFactor();
+        if (factor <= 0.0d)
+        {
+            return Map.of();
+        }
+
+        Map<Integer, Double> graphBoost = new HashMap<>();
+        for (Integer seedDocId : seeds)
+        {
+            double seedHybrid = hybridByDocId.get(seedDocId);
+            double contribution = seedHybrid * factor;
+            for (Integer neighborId : index.getNeighborDocIds(seedDocId))
+            {
+                graphBoost.merge(neighborId, contribution, Math::max);
+            }
+        }
+        return graphBoost;
     }
 }

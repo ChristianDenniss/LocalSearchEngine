@@ -2,6 +2,7 @@ com\localsearch\index\IncrementalIndexerTest.class
 com\localsearch\cli\CliParserTest.class
 com\localsearch\util\DocumentTextExtractorTest.class
 com\localsearch\crawler\FileCrawlerTest.class
+com\localsearch\index\DocumentRelationshipGraphTest.class
 com\localsearch\search\SearchServiceTest.class
 com\localsearch\util\TokenizerIndexingTest.class
 com\localsearch\util\TokenizerTest.class
