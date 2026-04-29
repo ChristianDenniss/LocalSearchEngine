@@ -175,7 +175,7 @@ public class LocalSearchEngineApp
         System.out.println("  search \"keyword only\" --no-graph");
         System.out.println("  search --reindex --root ./docs \"system design\"");
         System.out.println("  interactive input: volleyball stats --limit 10 --explain");
-        System.out.println("  interactive input: list   (or clear, cmds, flags, help)");
+        System.out.println("  interactive input: list   (or clear, cmds, explain, flags, help)");
     }
 
     private void ensureRootFolderExists(Path rootDirectory) throws IOException
@@ -234,6 +234,11 @@ public class LocalSearchEngineApp
                 printInteractiveFlags();
                 continue;
             }
+            if ("explain".equalsIgnoreCase(line))
+            {
+                printHowSearchWorks();
+                continue;
+            }
             if ("clear".equalsIgnoreCase(line) || "cls".equalsIgnoreCase(line))
             {
                 clearInteractiveConsole();
@@ -272,7 +277,7 @@ public class LocalSearchEngineApp
             }
             if (options.getQuery() == null || options.getQuery().isBlank())
             {
-                System.out.println("Enter a search query, or type cmds / flags / clear / list / help / exit.");
+                System.out.println("Enter a search query, or type cmds / explain / flags / clear / list / help / exit.");
                 continue;
             }
             lastResults = runSingleSearch(index, tokenizer, options, options.getRootDirectory());
@@ -424,7 +429,49 @@ public class LocalSearchEngineApp
 
     private void printInteractiveCommands()
     {
-        System.out.println("Commands: clear, cmds, flags, help, list, open <n>, location <n>, exit, quit");
+        System.out.println("Commands: clear, cmds, explain, flags, help, list, open <n>, location <n>, exit, quit");
+    }
+
+    private void printHowSearchWorks()
+    {
+        double graphFactor = GraphRetrievalConfig.DEFAULT.getNeighborBoostFactor();
+        int graphSeeds = GraphRetrievalConfig.DEFAULT.getMaxSeeds();
+        System.out.println();
+        System.out.println("How search works (lexical + semantic + graph)");
+        System.out.println();
+        System.out.println("LEXICAL (always on unless the query uses the very-short substring path)");
+        System.out.println("  Uses an inverted index: your query is split into terms, each term points at");
+        System.out.println("  documents where it appears. Scoring is TF-IDF style (rarer terms count more).");
+        System.out.println("  File names and paths are indexed too, so a query like \"resume\" can match");
+        System.out.println("  resume.pdf even if the body is empty. This is the usual \"keyword\" match.");
+        System.out.println();
+        System.out.println("SEMANTIC (on by default; turn off for one query with --no-semantic)");
+        System.out.println("  Each document gets a fixed-size vector built from its path + text (local");
+        System.out.println("  hashing embedder, not a big neural model). The query gets a vector the same way.");
+        System.out.println("  Cosine similarity measures how \"close\" the query is to each document.");
+        System.out.println("  Only documents above a modest similarity cutoff are kept as semantic hits.");
+        System.out.println("  That score is blended with lexical: default mix is 70% lexical / 30% semantic");
+        System.out.println("  (change with --semantic-weight 0.0-1.0). Pure vectors when lexical is weak");
+        System.out.println("  can still surface related wording.");
+        System.out.println();
+        System.out.println("GRAPH (on by default; turn off with --no-graph)");
+        System.out.println("  At index time, files in the same folder are linked as neighbors.");
+        System.out.println("  After lexical+semantic scores are computed, the strongest hits (up to "
+                + graphSeeds + ") act as \"seeds.\" Each seed boosts its folder neighbors by up to");
+        System.out.println("  (seed score x " + graphFactor + "). That can surface a sibling file that");
+        System.out.println("  does not literally contain your query but belongs with a strong hit.");
+        System.out.println();
+        System.out.println("RECENCY");
+        System.out.println("  Slightly prefers newer files on top of the retrieval score above.");
+        System.out.println();
+        System.out.println("FINAL LIST");
+        System.out.println("  Results are sorted by total score, then very weak hits compared to the");
+        System.out.println("  best match are dropped so unrelated files do not fill the list.");
+        System.out.println();
+        System.out.println("PER-RESULT NUMBERS (different from this command)");
+        System.out.println("  Add --explain to a query line to print tf-idf, recency, and matched terms");
+        System.out.println("  for each hit (e.g. my query --explain).");
+        System.out.println();
     }
 
     /** Same idea as the shell `clear` / Windows `cls`: wipe the terminal scrollback for this session. */
