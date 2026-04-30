@@ -29,6 +29,8 @@ import java.util.Scanner;
 
 public class LocalSearchEngineApp
 {
+    private static final String ANSI_RESET = "\u001B[0m";
+    private static final String ANSI_DARK_GREEN = "\u001B[32m";
     private boolean interactiveTipShown;
 
     public static void main(String[] args)
@@ -45,6 +47,7 @@ public class LocalSearchEngineApp
 
     public void run(String[] args) throws IOException, ClassNotFoundException
     {
+        printStartupBanner();
         CliParser cliParser = new CliParser();
         CliOptions options = cliParser.parse(args);
         if (options.getLimit() <= 0)
@@ -71,6 +74,41 @@ public class LocalSearchEngineApp
         }
 
         runSingleSearch(index, tokenizer, options, options.getRootDirectory());
+    }
+
+    private void printStartupBanner()
+    {
+        String bannerIndent = "  ";
+        String[] lines = {
+                "",
+                "_      ___   ____    _    _",
+                "| |    / _ \\ / ___|  / \\  | |",
+                "| |   | | | | |     / _ \\ | |",
+                "| |___| |_| | |___ / ___ \\| |___",
+                "|_____|\\___/ \\____/_/   \\_\\_____|",
+                "",
+                "____  _____    _    ____   ____ _   _",
+                "/ ___|| ____|  / \\  |  _ \\ / ___| | | |",
+                "\\___ \\|  _|   / _ \\ | |_) | |   | |_| |",
+                " ___) | |___ / ___ \\|  _ <| |___|  _  |",
+                "|____/|_____/_/   \\_\\_| \\_\\\\____|_| |_|",
+                ""
+        };
+
+        String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        boolean useAnsiColor = !osName.contains("win") || System.console() != null;
+        if (useAnsiColor)
+        {
+            System.out.print(ANSI_DARK_GREEN);
+        }
+        for (String line : lines)
+        {
+            System.out.println(line.isBlank() ? line : bannerIndent + line);
+        }
+        if (useAnsiColor)
+        {
+            System.out.print(ANSI_RESET);
+        }
     }
 
     private InvertedIndex prepareIndex(
