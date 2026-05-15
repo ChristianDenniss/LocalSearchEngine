@@ -1,0 +1,22 @@
+# Maven build output (keep dist/*.jar for distribution)
+dist/classes/
+dist/test-classes/
+dist/surefire-reports/
+dist/maven-status/
+dist/maven-archiver/
+dist/generated-sources/
+dist/generated-test-sources/
+dist/dependency-reduced-pom.xml
+
+# IDE
+.idea/
+*.iml
+.eclipse/
+.settings/
+.classpath
+.project
+*.class
+
+# OS
+.DS_Store
+Thumbs.db
