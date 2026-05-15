@@ -33,6 +33,19 @@ public class CliParser
                 case "--reindex" -> options.setReindex(true);
                 case "--no-semantic" -> options.setSemantic(false);
                 case "--no-graph" -> options.setGraphExpansion(false);
+                case "--ollama" -> options.setOllama(true);
+                case "--ollama-url" ->
+                {
+                    i++;
+                    ensureValue(args, i, "--ollama-url");
+                    options.setOllamaUrl(args[i]);
+                }
+                case "--ollama-model" ->
+                {
+                    i++;
+                    ensureValue(args, i, "--ollama-model");
+                    options.setOllamaModel(args[i]);
+                }
                 case "--semantic-weight" ->
                 {
                     i++;

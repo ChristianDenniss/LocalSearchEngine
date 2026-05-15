@@ -13,6 +13,7 @@ import com.localsearch.search.SemanticSearchConfig;
 import com.localsearch.search.SearchService;
 import com.localsearch.semantic.EmbeddingProvider;
 import com.localsearch.semantic.HashingEmbeddingProvider;
+import com.localsearch.semantic.OllamaEmbeddingProvider;
 import com.localsearch.util.SnippetGenerator;
 import com.localsearch.util.Tokenizer;
 
@@ -60,7 +61,7 @@ public class LocalSearchEngineApp
         }
 
         Tokenizer tokenizer = new Tokenizer();
-        EmbeddingProvider embeddingProvider = options.isSemantic() ? new HashingEmbeddingProvider(tokenizer) : null;
+        EmbeddingProvider embeddingProvider = buildEmbeddingProvider(options, tokenizer);
         InvertedIndex index = prepareIndex(options, tokenizer, embeddingProvider, true);
         if (options.isListIndexed())
         {
@@ -199,7 +200,7 @@ public class LocalSearchEngineApp
     private void printUsage()
     {
         System.out.println("Usage:");
-        System.out.println("  search \"query string\" [--limit N] [--explain] [--no-semantic] [--no-graph] [--semantic-weight 0.0-1.0] [--reindex] [--root PATH] [--index PATH]");
+        System.out.println("  search \"query string\" [--limit N] [--explain] [--no-semantic] [--no-graph] [--semantic-weight 0.0-1.0] [--ollama] [--ollama-url URL] [--ollama-model NAME] [--reindex] [--root PATH] [--index PATH]");
         System.out.println("  search  (starts interactive mode)");
         System.out.println("  search list [--root PATH] [--index PATH] [--reindex]  (print all indexed file paths)");
         System.out.println("  default root: ~/Documents/search bin\n");
@@ -214,6 +215,27 @@ public class LocalSearchEngineApp
         System.out.println("  search --reindex --root ./docs \"system design\"");
         System.out.println("  interactive input: volleyball stats --limit 10 --explain");
         System.out.println("  interactive input: list   (or clear, cmds, explain, flags, help)");
+    }
+
+    private EmbeddingProvider buildEmbeddingProvider(CliOptions options, Tokenizer tokenizer)
+    {
+        if (!options.isSemantic())
+        {
+            return null;
+        }
+        if (options.isOllama())
+        {
+            if (!OllamaEmbeddingProvider.isReachable(options.getOllamaUrl()))
+            {
+                System.out.println("Warning: Ollama not reachable at " + options.getOllamaUrl()
+                        + " — falling back to local hashing embedder.");
+                return new HashingEmbeddingProvider(tokenizer);
+            }
+            System.out.println("Using Ollama for semantic embeddings: " + options.getOllamaUrl()
+                    + "  model: " + options.getOllamaModel());
+            return new OllamaEmbeddingProvider(options.getOllamaUrl(), options.getOllamaModel());
+        }
+        return new HashingEmbeddingProvider(tokenizer);
     }
 
     private void ensureRootFolderExists(Path rootDirectory) throws IOException
@@ -306,7 +328,7 @@ public class LocalSearchEngineApp
                 continue;
             }
 
-            EmbeddingProvider embeddingProvider = options.isSemantic() ? new HashingEmbeddingProvider(tokenizer) : null;
+            EmbeddingProvider embeddingProvider = buildEmbeddingProvider(options, tokenizer);
             index = prepareIndex(options, tokenizer, embeddingProvider, false);
             if (options.isListIndexed())
             {
@@ -547,6 +569,9 @@ public class LocalSearchEngineApp
         System.out.println("  --no-semantic         Lexical + recency only for this query (semantic is on by default)");
         System.out.println("  --no-graph            Turn off folder-neighbor graph boost for this query");
         System.out.println("  --semantic-weight <x>  How much to weight vectors vs keywords, 0.0–1.0 (default: 0.3)");
+        System.out.println("  --ollama              Use a local Ollama server for neural embeddings instead of the hashing embedder");
+        System.out.println("  --ollama-url <url>    Ollama base URL (default: http://localhost:11434)");
+        System.out.println("  --ollama-model <name> Ollama embedding model (default: nomic-embed-text)");
     }
 
     private void maybePrintInteractiveTip(List<SearchResult> results)
