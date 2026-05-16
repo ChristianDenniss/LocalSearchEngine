@@ -6,16 +6,18 @@ on:
       - "v*.*.*"
 
 jobs:
-  release:
+  build-jar:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
+    outputs:
+      version: ${{ steps.version.outputs.value }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
+      - name: Extract version from tag
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
         with:
           java-version: "17"
           distribution: temurin
@@ -24,8 +26,97 @@ jobs:
       - name: Build fat JAR
         run: mvn -B package -DskipTests
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fat-jar
+          path: dist/local-search-engine-*.jar
+
+  native-package:
+    needs: build-jar
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows
+          - os: macos-latest
+            label: macos
+          - os: ubuntu-latest
+            label: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: fat-jar
+          path: dist/
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: temurin
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          VERSION=${{ needs.build-jar.outputs.version }}
+          JAR=$(ls dist/*.jar | head -1 | xargs basename)
+          jpackage \
+            --input dist \
+            --main-jar "$JAR" \
+            --name local-search \
+            --app-version "$VERSION" \
+            --type app-image \
+            --win-console \
+            --dest out
+          7z a "local-search-windows-${VERSION}.zip" ./out/local-search/
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          VERSION=${{ needs.build-jar.outputs.version }}
+          JAR=$(ls dist/*.jar | head -1 | xargs basename)
+          jpackage \
+            --input dist \
+            --main-jar "$JAR" \
+            --name local-search \
+            --app-version "$VERSION" \
+            --type app-image \
+            --dest out
+          cd out && zip -r "../local-search-macos-${VERSION}.zip" local-search.app
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          VERSION=${{ needs.build-jar.outputs.version }}
+          JAR=$(ls dist/*.jar | head -1 | xargs basename)
+          jpackage \
+            --input dist \
+            --main-jar "$JAR" \
+            --name local-search \
+            --app-version "$VERSION" \
+            --type app-image \
+            --dest out
+          tar czf "local-search-linux-${VERSION}.tar.gz" -C out local-search
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.label }}
+          path: local-search-${{ matrix.label }}-*
+
+  release:
+    needs: [build-jar, native-package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: release-files/
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/local-search-engine-*.jar
+          files: release-files/**
           generate_release_notes: true
