@@ -13,6 +13,7 @@ import com.localsearch.search.SemanticSearchConfig;
 import com.localsearch.search.SearchService;
 import com.localsearch.semantic.EmbeddingProvider;
 import com.localsearch.semantic.HashingEmbeddingProvider;
+import com.localsearch.semantic.OllamaEmbeddingProvider;
 import com.localsearch.util.SnippetGenerator;
 import com.localsearch.util.Tokenizer;
 
@@ -47,12 +48,19 @@ public class LocalSearchEngineApp
 
     public void run(String[] args) throws IOException, ClassNotFoundException
     {
-        printStartupBanner();
         CliParser cliParser = new CliParser();
         CliOptions options = cliParser.parse(args);
+        if (!options.isNoBanner())
+        {
+            printStartupBanner();
+        }
         if (options.getLimit() <= 0)
         {
             throw new IllegalArgumentException("--limit must be greater than 0");
+        }
+        if (options.getPage() < 1)
+        {
+            throw new IllegalArgumentException("--page must be 1 or greater");
         }
         if (options.getSemanticWeight() < 0.0d || options.getSemanticWeight() > 1.0d)
         {
@@ -60,7 +68,7 @@ public class LocalSearchEngineApp
         }
 
         Tokenizer tokenizer = new Tokenizer();
-        EmbeddingProvider embeddingProvider = options.isSemantic() ? new HashingEmbeddingProvider(tokenizer) : null;
+        EmbeddingProvider embeddingProvider = buildEmbeddingProvider(options, tokenizer);
         InvertedIndex index = prepareIndex(options, tokenizer, embeddingProvider, true);
         if (options.isListIndexed())
         {
@@ -165,16 +173,21 @@ public class LocalSearchEngineApp
         return index;
     }
 
-    private void printResults(List<SearchResult> results, List<String> queryTerms, boolean explain, Path rootDirectory)
+    private void printResults(List<SearchResult> results, List<String> queryTerms, boolean explain, Path rootDirectory, int page, boolean hasMore)
     {
         if (results.isEmpty())
         {
-            System.out.println("No results found.");
+            System.out.println(page > 1 ? "No more results." : "No results found.");
             return;
         }
 
         int count = results.size();
-        System.out.println("\n" + (count == 1 ? "1 RESULT FOUND:" : count + " RESULTS FOUND:") + "\n");
+        String header = (count == 1 ? "1 RESULT" : count + " RESULTS");
+        if (page > 1)
+        {
+            header += "  (page " + page + ")";
+        }
+        System.out.println("\n" + header + "\n");
 
         SnippetGenerator snippetGenerator = new SnippetGenerator();
         int rank = 1;
@@ -194,12 +207,16 @@ public class LocalSearchEngineApp
             System.out.println("\n");
             rank++;
         }
+        if (hasMore)
+        {
+            System.out.println("  -- more results available: add --page " + (page + 1) + " or type 'next' in interactive mode --\n");
+        }
     }
 
     private void printUsage()
     {
         System.out.println("Usage:");
-        System.out.println("  search \"query string\" [--limit N] [--explain] [--no-semantic] [--no-graph] [--semantic-weight 0.0-1.0] [--reindex] [--root PATH] [--index PATH]");
+        System.out.println("  search \"query string\" [--limit N] [--explain] [--no-semantic] [--no-graph] [--semantic-weight 0.0-1.0] [--ollama] [--ollama-url URL] [--ollama-model NAME] [--reindex] [--root PATH] [--index PATH]");
         System.out.println("  search  (starts interactive mode)");
         System.out.println("  search list [--root PATH] [--index PATH] [--reindex]  (print all indexed file paths)");
         System.out.println("  default root: ~/Documents/search bin\n");
@@ -214,6 +231,27 @@ public class LocalSearchEngineApp
         System.out.println("  search --reindex --root ./docs \"system design\"");
         System.out.println("  interactive input: volleyball stats --limit 10 --explain");
         System.out.println("  interactive input: list   (or clear, cmds, explain, flags, help)");
+    }
+
+    private EmbeddingProvider buildEmbeddingProvider(CliOptions options, Tokenizer tokenizer)
+    {
+        if (!options.isSemantic())
+        {
+            return null;
+        }
+        if (options.isOllama())
+        {
+            if (!OllamaEmbeddingProvider.isReachable(options.getOllamaUrl()))
+            {
+                System.out.println("Warning: Ollama not reachable at " + options.getOllamaUrl()
+                        + " — falling back to local hashing embedder.");
+                return new HashingEmbeddingProvider(tokenizer);
+            }
+            System.out.println("Using Ollama for semantic embeddings: " + options.getOllamaUrl()
+                    + "  model: " + options.getOllamaModel());
+            return new OllamaEmbeddingProvider(options.getOllamaUrl(), options.getOllamaModel());
+        }
+        return new HashingEmbeddingProvider(tokenizer);
     }
 
     private void ensureRootFolderExists(Path rootDirectory) throws IOException
@@ -240,6 +278,8 @@ public class LocalSearchEngineApp
         @SuppressWarnings("resource")
         Scanner scanner = new Scanner(System.in);
         List<SearchResult> lastResults = List.of();
+        String lastSearchLine = null;
+        int lastPage = 1;
         while (true)
         {
             System.out.print("search> ");
@@ -282,6 +322,15 @@ public class LocalSearchEngineApp
                 clearInteractiveConsole();
                 continue;
             }
+            if ("next".equalsIgnoreCase(line))
+            {
+                if (lastSearchLine == null)
+                {
+                    System.out.println("No previous search. Run a query first.");
+                    continue;
+                }
+                line = lastSearchLine + " --page " + (lastPage + 1);
+            }
             if (line.toLowerCase(Locale.ROOT).startsWith("open "))
             {
                 openResult(line, lastResults);
@@ -300,13 +349,18 @@ public class LocalSearchEngineApp
                 System.out.println("Error: --limit must be greater than 0");
                 continue;
             }
+            if (options.getPage() < 1)
+            {
+                System.out.println("Error: --page must be 1 or greater");
+                continue;
+            }
             if (options.getSemanticWeight() < 0.0d || options.getSemanticWeight() > 1.0d)
             {
                 System.out.println("Error: --semantic-weight must be between 0 and 1");
                 continue;
             }
 
-            EmbeddingProvider embeddingProvider = options.isSemantic() ? new HashingEmbeddingProvider(tokenizer) : null;
+            EmbeddingProvider embeddingProvider = buildEmbeddingProvider(options, tokenizer);
             index = prepareIndex(options, tokenizer, embeddingProvider, false);
             if (options.isListIndexed())
             {
@@ -319,6 +373,11 @@ public class LocalSearchEngineApp
                 continue;
             }
             lastResults = runSingleSearch(index, tokenizer, options, options.getRootDirectory());
+            if (options.getQuery() != null && !options.getQuery().isBlank())
+            {
+                lastSearchLine = options.getQuery();
+                lastPage = options.getPage();
+            }
         }
     }
 
@@ -335,10 +394,19 @@ public class LocalSearchEngineApp
                 ? GraphRetrievalConfig.DEFAULT
                 : GraphRetrievalConfig.DISABLED;
         SearchService searchService = new SearchService(tokenizer, new Ranker(), semanticConfig, graphConfig);
-        List<SearchResult> results = searchService.search(index, options.getQuery(), options.getLimit());
-        printResults(results, tokenizer.tokenize(options.getQuery()), options.isExplain(), rootDirectory);
-        maybePrintInteractiveTip(results);
-        return results;
+
+        int page = options.getPage();
+        int pageSize = options.getLimit();
+        int offset = (page - 1) * pageSize;
+        List<SearchResult> all = searchService.search(index, options.getQuery(), page * pageSize);
+        boolean hasMore = all.size() > offset + pageSize;
+        List<SearchResult> pageResults = all.subList(
+                Math.min(offset, all.size()),
+                Math.min(offset + pageSize, all.size()));
+
+        printResults(pageResults, tokenizer.tokenize(options.getQuery()), options.isExplain(), rootDirectory, page, hasMore);
+        maybePrintInteractiveTip(pageResults);
+        return pageResults;
     }
 
     private String[] parseInputLine(String line)
@@ -467,7 +535,7 @@ public class LocalSearchEngineApp
 
     private void printInteractiveCommands()
     {
-        System.out.println("Commands: clear, cmds, explain, flags, help, list, open <n>, location <n>, exit, quit");
+        System.out.println("Commands: clear, cmds, explain, flags, help, list, next, open <n>, location <n>, exit, quit");
     }
 
     private void printHowSearchWorks()
@@ -547,6 +615,11 @@ public class LocalSearchEngineApp
         System.out.println("  --no-semantic         Lexical + recency only for this query (semantic is on by default)");
         System.out.println("  --no-graph            Turn off folder-neighbor graph boost for this query");
         System.out.println("  --semantic-weight <x>  How much to weight vectors vs keywords, 0.0–1.0 (default: 0.3)");
+        System.out.println("  --page <n>            Page of results to show, 1-indexed (default: 1); use 'next' to advance");
+        System.out.println("  --no-banner           Suppress the startup banner (useful for scripting)");
+        System.out.println("  --ollama              Use a local Ollama server for neural embeddings instead of the hashing embedder");
+        System.out.println("  --ollama-url <url>    Ollama base URL (default: http://localhost:11434)");
+        System.out.println("  --ollama-model <name> Ollama embedding model (default: nomic-embed-text)");
     }
 
     private void maybePrintInteractiveTip(List<SearchResult> results)

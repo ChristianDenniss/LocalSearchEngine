@@ -33,6 +33,26 @@ public class CliParser
                 case "--reindex" -> options.setReindex(true);
                 case "--no-semantic" -> options.setSemantic(false);
                 case "--no-graph" -> options.setGraphExpansion(false);
+                case "--no-banner" -> options.setNoBanner(true);
+                case "--page" ->
+                {
+                    i++;
+                    ensureValue(args, i, "--page");
+                    options.setPage(Integer.parseInt(args[i]));
+                }
+                case "--ollama" -> options.setOllama(true);
+                case "--ollama-url" ->
+                {
+                    i++;
+                    ensureValue(args, i, "--ollama-url");
+                    options.setOllamaUrl(args[i]);
+                }
+                case "--ollama-model" ->
+                {
+                    i++;
+                    ensureValue(args, i, "--ollama-model");
+                    options.setOllamaModel(args[i]);
+                }
                 case "--semantic-weight" ->
                 {
                     i++;
