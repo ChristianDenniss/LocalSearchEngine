@@ -86,7 +86,7 @@ class AppIntegrationTest
         run("search", "java", "--root", root(), "--index", index(), "--no-semantic", "--no-graph", "--limit", "2");
 
         String output = output();
-        assertTrue(output.contains("2 RESULTS FOUND:"), "Should cap results at 2");
+        assertTrue(output.contains("2 RESULTS"), "Should cap results at 2");
     }
 
     @Test

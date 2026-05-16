@@ -18,6 +18,8 @@ public class CliOptions
     private boolean ollama;
     private String ollamaUrl = "http://localhost:11434";
     private String ollamaModel = "nomic-embed-text";
+    private int page = 1;
+    private boolean noBanner;
     private Path rootDirectory = defaultRootDirectory();
     private Path indexFile = defaultRootDirectory().resolve("index.dat").toAbsolutePath().normalize();
 
@@ -149,6 +151,26 @@ public class CliOptions
     public void setOllamaModel(String ollamaModel)
     {
         this.ollamaModel = ollamaModel;
+    }
+
+    public int getPage()
+    {
+        return page;
+    }
+
+    public void setPage(int page)
+    {
+        this.page = page;
+    }
+
+    public boolean isNoBanner()
+    {
+        return noBanner;
+    }
+
+    public void setNoBanner(boolean noBanner)
+    {
+        this.noBanner = noBanner;
     }
 
     private static Path defaultRootDirectory()
