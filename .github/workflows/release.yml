@@ -31,6 +31,11 @@ jobs:
           name: fat-jar
           path: dist/local-search-engine-*.jar
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: install-scripts
+          path: package/
+
   native-package:
     needs: build-jar
     strategy:
@@ -49,6 +54,11 @@ jobs:
         with:
           name: fat-jar
           path: dist/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: install-scripts
+          path: install-scripts/
 
       - uses: actions/setup-java@v4
         with:
@@ -69,7 +79,8 @@ jobs:
             --type app-image \
             --win-console \
             --dest out
-          7z a "local-search-windows-${VERSION}.zip" ./out/local-search/
+          cp install-scripts/install-windows.bat out/install.bat
+          7z a "local-search-windows-${VERSION}.zip" ./out/local-search/ ./out/install.bat
 
       - name: Package (macOS)
         if: runner.os == 'macOS'
@@ -83,7 +94,9 @@ jobs:
             --app-version "$VERSION" \
             --type app-image \
             --dest out
-          cd out && zip -r "../local-search-macos-${VERSION}.zip" local-search.app
+          cp install-scripts/install-unix.sh out/install.sh
+          chmod +x out/install.sh
+          cd out && zip -r "../local-search-macos-${VERSION}.zip" local-search.app install.sh
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
@@ -97,7 +110,9 @@ jobs:
             --app-version "$VERSION" \
             --type app-image \
             --dest out
-          tar czf "local-search-linux-${VERSION}.tar.gz" -C out local-search
+          cp install-scripts/install-unix.sh out/install.sh
+          chmod +x out/install.sh
+          tar czf "local-search-linux-${VERSION}.tar.gz" -C out local-search install.sh
 
       - uses: actions/upload-artifact@v4
         with:
@@ -120,3 +135,26 @@ jobs:
         with:
           files: release-files/**
           generate_release_notes: true
+          body: |
+            ## Installation
+
+            ### Windows (no Java required)
+            1. Download `local-search-windows-X.Y.Z.zip` and unzip it anywhere
+            2. Double-click **`install.bat`** — adds `search` to your terminal PATH
+            3. Open a **new** terminal and run: `search "your query"`
+
+            ### macOS (no Java required)
+            1. Download `local-search-macos-X.Y.Z.zip` and unzip it
+            2. Run `bash install.sh` in the unzipped folder
+            3. Restart your terminal and run: `search "your query"`
+
+            ### Linux (no Java required)
+            1. Download `local-search-linux-X.Y.Z.tar.gz` and extract it
+            2. Run `bash install.sh` in the extracted folder
+            3. Restart your terminal and run: `search "your query"`
+
+            ### Already have Java?
+            Download `local-search-engine-X.Y.Z.jar` and run:
+            ```
+            java -jar local-search-engine-X.Y.Z.jar search "your query"
+            ```
