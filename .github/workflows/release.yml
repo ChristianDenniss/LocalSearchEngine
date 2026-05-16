@@ -6,16 +6,18 @@ on:
       - "v*.*.*"
 
 jobs:
-  release:
+  build-jar:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
+    outputs:
+      version: ${{ steps.version.outputs.value }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
+      - name: Extract version from tag
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
         with:
           java-version: "17"
           distribution: temurin
@@ -24,8 +26,135 @@ jobs:
       - name: Build fat JAR
         run: mvn -B package -DskipTests
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fat-jar
+          path: dist/local-search-engine-*.jar
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: install-scripts
+          path: package/
+
+  native-package:
+    needs: build-jar
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows
+          - os: macos-latest
+            label: macos
+          - os: ubuntu-latest
+            label: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: fat-jar
+          path: dist/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: install-scripts
+          path: install-scripts/
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: temurin
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          VERSION=${{ needs.build-jar.outputs.version }}
+          JAR=$(ls dist/*.jar | head -1 | xargs basename)
+          jpackage \
+            --input dist \
+            --main-jar "$JAR" \
+            --name local-search \
+            --app-version "$VERSION" \
+            --type app-image \
+            --win-console \
+            --dest out
+          cp install-scripts/install-windows.bat out/install.bat
+          7z a "local-search-windows-${VERSION}.zip" ./out/local-search/ ./out/install.bat
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          VERSION=${{ needs.build-jar.outputs.version }}
+          JAR=$(ls dist/*.jar | head -1 | xargs basename)
+          jpackage \
+            --input dist \
+            --main-jar "$JAR" \
+            --name local-search \
+            --app-version "$VERSION" \
+            --type app-image \
+            --dest out
+          cp install-scripts/install-unix.sh out/install.sh
+          chmod +x out/install.sh
+          cd out && zip -r "../local-search-macos-${VERSION}.zip" local-search.app install.sh
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          VERSION=${{ needs.build-jar.outputs.version }}
+          JAR=$(ls dist/*.jar | head -1 | xargs basename)
+          jpackage \
+            --input dist \
+            --main-jar "$JAR" \
+            --name local-search \
+            --app-version "$VERSION" \
+            --type app-image \
+            --dest out
+          cp install-scripts/install-unix.sh out/install.sh
+          chmod +x out/install.sh
+          tar czf "local-search-linux-${VERSION}.tar.gz" -C out local-search install.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.label }}
+          path: local-search-${{ matrix.label }}-*
+
+  release:
+    needs: [build-jar, native-package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: release-files/
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/local-search-engine-*.jar
+          files: release-files/**
           generate_release_notes: true
+          body: |
+            ## Installation
+
+            ### Windows (no Java required)
+            1. Download `local-search-windows-X.Y.Z.zip` and unzip it anywhere
+            2. Double-click **`install.bat`** — adds `search` to your terminal PATH
+            3. Open a **new** terminal and run: `search "your query"`
+
+            ### macOS (no Java required)
+            1. Download `local-search-macos-X.Y.Z.zip` and unzip it
+            2. Run `bash install.sh` in the unzipped folder
+            3. Restart your terminal and run: `search "your query"`
+
+            ### Linux (no Java required)
+            1. Download `local-search-linux-X.Y.Z.tar.gz` and extract it
+            2. Run `bash install.sh` in the extracted folder
+            3. Restart your terminal and run: `search "your query"`
+
+            ### Already have Java?
+            Download `local-search-engine-X.Y.Z.jar` and run:
+            ```
+            java -jar local-search-engine-X.Y.Z.jar search "your query"
+            ```
